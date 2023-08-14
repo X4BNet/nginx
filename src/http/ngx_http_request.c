@@ -586,6 +586,8 @@ ngx_http_alloc_request(ngx_connection_t *c)
     }
 
     r->pool = pool;
+    
+    RAND_bytes(r->uuid, 12);
 
     r->http_connection = hc;
     r->signature = NGX_HTTP_MODULE;
@@ -3860,6 +3862,7 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
     u_char                    *p;
     ngx_http_upstream_t       *u;
     ngx_http_core_srv_conf_t  *cscf;
+    ngx_http_core_main_conf_t *cmcf;
     u_int i, f;
 
     cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
@@ -3900,6 +3903,18 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
         buf += f;
         len -= f;
     }
+
+    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
+
+    p = ngx_snprintf(buf, len, ", uuid: \"%08xd-%04uxd-%04uxd-%04uxd-%012uxL\"", 
+        cmcf->id_prefix + ngx_pid,
+        (*(uint32_t*)&r->uuid[0] & 0xFFFF0000) >> 16,
+        (*(uint32_t*)&r->uuid[0] & 0x0000FFFF),
+        (*(uint32_t*)&r->uuid[4] & 0xFFFF0000) >> 16,
+        (*(uint64_t*)&r->uuid[4]) & 0x00FFFFFFFFFFFFULL
+    );
+    len -= p - buf;
+    buf = p;
 
     if (r != sr) {
         p = ngx_snprintf(buf, len, ", subrequest: \"%V\"", &sr->uri);

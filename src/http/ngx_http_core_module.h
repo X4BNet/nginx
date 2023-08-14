@@ -171,6 +171,8 @@ typedef struct {
     ngx_uint_t                 variables_hash_max_size;
     ngx_uint_t                 variables_hash_bucket_size;
 
+    ngx_uint_t                 id_prefix;
+
     ngx_hash_keys_arrays_t    *variables_keys;
 
     ngx_array_t               *ports;

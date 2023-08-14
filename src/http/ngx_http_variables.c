@@ -2212,38 +2212,30 @@ static ngx_int_t
 ngx_http_variable_request_id(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
+    ngx_http_core_main_conf_t  *cmcf;
+
     u_char  *id;
-
-#if (NGX_OPENSSL)
-    u_char   random_bytes[16];
-#endif
-
-    id = ngx_pnalloc(r->pool, 32);
-    if (id == NULL) {
-        return NGX_ERROR;
-    }
 
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    v->len = 32;
-    v->data = id;
+    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
 
-#if (NGX_OPENSSL)
-
-    if (RAND_bytes(random_bytes, 16) == 1) {
-        ngx_hex_dump(id, random_bytes, 16);
-        return NGX_OK;
+    id = ngx_pnalloc(r->pool, 36);
+    if (id == NULL) {
+        return NGX_ERROR;
     }
 
-    ngx_ssl_error(NGX_LOG_ERR, r->connection->log, 0, "RAND_bytes() failed");
-
-#endif
-
-    ngx_sprintf(id, "%08xD%08xD%08xD%08xD",
-                (uint32_t) ngx_random(), (uint32_t) ngx_random(),
-                (uint32_t) ngx_random(), (uint32_t) ngx_random());
+    v->len = 36;
+    ngx_snprintf(id, 36, "%08xd-%04uxd-%04uxd-%04uxd-%012uxL", 
+        cmcf->id_prefix + ngx_pid,
+        (*(uint32_t*)&r->uuid[0] & 0xFFFF0000) >> 16,
+        (*(uint32_t*)&r->uuid[0] & 0x0000FFFF),
+        (*(uint32_t*)&r->uuid[4] & 0xFFFF0000) >> 16,
+        (*(uint64_t*)&r->uuid[4]) & 0x00FFFFFFFFFFFFULL
+    );
+    v->data = id;
 
     return NGX_OK;
 }
