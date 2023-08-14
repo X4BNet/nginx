@@ -19,6 +19,10 @@
 #define NGINX_VER_BUILD    NGINX_VER
 #endif
 
+#ifndef X4B_BUILD
+#define X4B_BUILD          "unknown"
+#endif
+
 #define NGINX_VAR          "NGINX"
 #define NGX_OLDPID_EXT     ".oldbin"
 

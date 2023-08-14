@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <linux/sockios.h>
 
 
 static void ngx_http_wait_request_handler(ngx_event_t *ev);
@@ -203,6 +204,29 @@ ngx_http_header_t  ngx_http_headers_in[] = {
 };
 
 
+ngx_msec_t send_timeout(ngx_http_request_t *r, ngx_msec_t send_timeout){
+    time_t elapsed;
+    ngx_connection_t* c;
+    int dest;
+    uint32_t rate;
+
+    c = r->connection;
+    if(!r->upstream || r->upstream->upgrade) return send_timeout * 2;
+    elapsed = ngx_time() - r->start_sec;
+    if(elapsed < 30) return send_timeout * 2;
+    if(!c) return send_timeout;
+    rate = c->sent / elapsed;
+    if (rate > 10000) return send_timeout;
+    if(ioctl(c->fd, SIOCOUTQ, &dest) == 0) return send_timeout;
+    if(dest < 60000) return send_timeout;
+    if(elapsed > 60 && rate <= 500) return 1; /* that's real soon mate */ 
+    return 6000;
+}
+
+ngx_msec_t send_timeout_v(void* a, ngx_msec_t st){
+    return send_timeout((ngx_http_request_t *)a, st);
+}
+
 void
 ngx_http_init_connection(ngx_connection_t *c)
 {
@@ -364,7 +388,7 @@ ngx_http_init_connection(ngx_connection_t *c)
 
     cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
 
-    ngx_add_timer(rev, cscf->client_header_timeout);
+    ngx_add_timer(rev, hc->ssl ? c->listening->ssl_hello_timeout : cscf->client_header_timeout);
     ngx_reusable_connection(c, 1);
 
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
@@ -793,6 +817,9 @@ ngx_http_ssl_handshake(ngx_event_t *rev)
 static void
 ngx_http_ssl_handshake_handler(ngx_connection_t *c)
 {
+    ngx_http_core_srv_conf_t  *cscf;
+    ngx_http_connection_t  *hc;
+
     if (c->ssl->handshaked) {
 
         /*
@@ -804,15 +831,13 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
          */
 
         c->ssl->no_wait_shutdown = 1;
+        hc = c->data;
 
 #if (NGX_HTTP_V2                                                              \
      && defined TLSEXT_TYPE_application_layer_protocol_negotiation)
         {
         unsigned int            len;
         const unsigned char    *data;
-        ngx_http_connection_t  *hc;
-
-        hc = c->data;
 
         if (hc->addr_conf->http2) {
 
@@ -832,6 +857,13 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
         /* STUB: epoll edge */ c->write->handler = ngx_http_empty_handler;
 
         ngx_reusable_connection(c, 1);
+
+        // start new timer for the request
+        if(c->read->timer_set) {
+            cscf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_core_module);
+            ngx_del_timer(c->read);
+            ngx_add_timer(c->read, cscf->client_header_timeout);
+        }
 
         ngx_http_wait_request_handler(c->read);
 
@@ -1095,8 +1127,8 @@ ngx_http_process_request_line(ngx_event_t *rev)
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http request line: \"%V\"", &r->request_line);
 
-            r->method_name.len = r->method_end - r->request_start + 1;
-            r->method_name.data = r->request_line.data;
+            r->orig_method_name.len = r->method_name.len = r->method_end - r->request_start + 1;
+            r->orig_method_name.data = r->method_name.data = r->request_line.data;
 
             if (r->http_protocol.data) {
                 r->http_protocol.len = r->request_end - r->http_protocol.data;
@@ -2810,7 +2842,7 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     if (!wev->delayed) {
-        ngx_add_timer(wev, clcf->send_timeout);
+        ngx_add_timer(wev, send_timeout(r, clcf->send_timeout));
     }
 
     if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
@@ -2852,7 +2884,7 @@ ngx_http_writer(ngx_http_request_t *r)
                        "http writer delayed");
 
         if (!wev->delayed) {
-            ngx_add_timer(wev, clcf->send_timeout);
+            ngx_add_timer(wev, send_timeout(r, clcf->send_timeout));
         }
 
         if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
@@ -2876,7 +2908,7 @@ ngx_http_writer(ngx_http_request_t *r)
     if (r->buffered || r->postponed || (r == r->main && c->buffered)) {
 
         if (!wev->delayed) {
-            ngx_add_timer(wev, clcf->send_timeout);
+            ngx_add_timer(wev, send_timeout(r, clcf->send_timeout));
         }
 
         if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
@@ -3828,6 +3860,7 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
     u_char                    *p;
     ngx_http_upstream_t       *u;
     ngx_http_core_srv_conf_t  *cscf;
+    u_int i, f;
 
     cscf = ngx_http_get_module_srv_conf(r, ngx_http_core_module);
 
@@ -3846,10 +3879,26 @@ ngx_http_log_error_handler(ngx_http_request_t *r, ngx_http_request_t *sr,
         r->request_line.data = r->request_start;
     }
 
-    if (r->request_line.len) {
-        p = ngx_snprintf(buf, len, ", request: \"%V\"", &r->request_line);
+    if (r->request_line.len && len >= (sizeof(", request: \"") + r->request_line.len + sizeof("\"") - 2)) {
+        p = ngx_copy(buf, ", request: \"", sizeof(", request: \"") - 1);
         len -= p - buf;
         buf = p;
+    
+        f = 0;
+        for(i=0;i<r->request_line.len;i++)
+        {
+            if(r->request_line.data[i]==0)
+            {
+                buf[f++] = 0xC0;
+                buf[f++] = 0x80;
+            }else{
+                buf[f++] = r->request_line.data[i];
+            }
+        }
+
+        buf[f++] = '"';
+        buf += f;
+        len -= f;
     }
 
     if (r != sr) {

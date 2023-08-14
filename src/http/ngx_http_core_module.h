@@ -81,6 +81,9 @@ typedef struct {
     unsigned                   deferred_accept:1;
     unsigned                   reuseport:1;
     unsigned                   so_keepalive:2;
+#if (NGX_HAVE_TPROXY)
+    unsigned                   tproxy:1;
+#endif
     unsigned                   proxy_protocol:1;
 
     int                        backlog;
@@ -195,6 +198,10 @@ typedef struct {
     ngx_bufs_t                  large_client_header_buffers;
 
     ngx_msec_t                  client_header_timeout;
+
+    ngx_msec_t                  client_ssl_hello_timeout;
+    ngx_msec_t                  client_ssl_certificate_timeout;
+
 
     ngx_flag_t                  ignore_invalid_headers;
     ngx_flag_t                  merge_slashes;

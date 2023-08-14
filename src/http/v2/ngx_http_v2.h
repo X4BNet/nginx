@@ -121,6 +121,7 @@ struct ngx_http_v2_connection_s {
     off_t                            total_bytes;
     off_t                            payload_bytes;
 
+    ngx_uint_t                       concurrent_streams_limit;
     ngx_uint_t                       processing;
     ngx_uint_t                       frames;
     ngx_uint_t                       idle;
@@ -164,6 +165,7 @@ struct ngx_http_v2_connection_s {
     unsigned                         blocked:1;
     unsigned                         goaway:1;
     unsigned                         push_disabled:1;
+    unsigned                         limit_conn:1;
 };
 
 

@@ -391,6 +391,7 @@ static void
 ngx_show_version_info(void)
 {
     ngx_write_stderr("nginx version: " NGINX_VER_BUILD NGX_LINEFEED);
+    ngx_write_stderr("x4b build: " X4B_BUILD NGX_LINEFEED);
 
     if (ngx_show_help) {
         ngx_write_stderr(

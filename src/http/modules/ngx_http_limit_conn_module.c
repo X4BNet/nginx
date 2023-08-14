@@ -8,6 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_http_v2.h>
 
 
 #define NGX_HTTP_LIMIT_CONN_PASSED            1
@@ -190,10 +191,19 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
     ngx_http_limit_conn_conf_t     *lccf;
     ngx_http_limit_conn_limit_t    *limits;
     ngx_http_limit_conn_cleanup_t  *lccln;
+    ngx_pool_t                     *pool;
 
     if (r->main->limit_conn_status) {
         return NGX_DECLINED;
     }
+
+    #if (NGX_HTTP_V2)
+    if (r->stream && r->stream->connection->limit_conn == 1) {
+        // HTTP/2 & HTTP/3 connections are not limited to one request per connection
+        r->main->limit_conn_status = NGX_HTTP_LIMIT_CONN_PASSED;
+        return NGX_DECLINED;
+    }
+    #endif
 
     lccf = ngx_http_get_module_loc_conf(r, ngx_http_limit_conn_module);
     limits = lccf->limits.elts;
@@ -291,8 +301,20 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
 
         ngx_shmtx_unlock(&ctx->shpool->mutex);
 
-        cln = ngx_pool_cleanup_add(r->pool,
-                                   sizeof(ngx_http_limit_conn_cleanup_t));
+        /*
+        For HTTP/2 and HTTP/3 connections, we need to use the connection pool for the cleanup handler
+        because there is multiple requests per connection.
+        */
+        #if (NGX_HTTP_V2)
+        if (r->stream) {
+            pool = r->stream->connection->pool;
+        } else {
+            pool = r->pool;
+        }
+        #else
+        pool = r->pool;
+        #endif
+        cln = ngx_pool_cleanup_add(pool, sizeof(ngx_http_limit_conn_cleanup_t));
         if (cln == NULL) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -303,6 +325,12 @@ ngx_http_limit_conn_handler(ngx_http_request_t *r)
         lccln->shm_zone = limits[i].shm_zone;
         lccln->node = node;
     }
+
+    #if (NGX_HTTP_V2)
+    if (r->stream) {
+        r->stream->connection->limit_conn = 1;
+    }
+    #endif
 
     return NGX_DECLINED;
 }

@@ -46,6 +46,9 @@ struct ngx_listening_s {
     /* should be here because of the AcceptEx() preread */
     size_t              post_accept_buffer_size;
 
+    ngx_msec_t          ssl_hello_timeout;
+    ngx_msec_t          ssl_certificate_timeout;
+
     ngx_listening_t    *previous;
     ngx_connection_t   *connection;
 
@@ -86,6 +89,9 @@ struct ngx_listening_s {
 
 #if (NGX_HAVE_TCP_FASTOPEN)
     int                 fastopen;
+#endif
+#if (NGX_HAVE_TPROXY)
+    unsigned            tproxy;
 #endif
 
 };

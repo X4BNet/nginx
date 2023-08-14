@@ -414,6 +414,7 @@ struct ngx_http_request_s {
     ngx_str_t                         exten;
     ngx_str_t                         unparsed_uri;
 
+    ngx_str_t                         orig_method_name;
     ngx_str_t                         method_name;
     ngx_str_t                         http_protocol;
     ngx_str_t                         schema;
@@ -610,6 +611,11 @@ typedef struct {
 
 extern ngx_http_header_t       ngx_http_headers_in[];
 extern ngx_http_header_out_t   ngx_http_headers_out[];
+
+struct ngx_http_core_loc_conf_s;
+typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
+
+ngx_msec_t send_timeout(ngx_http_request_t *r, ngx_msec_t send_timeout);
 
 
 #define ngx_http_set_log_request(log, r)                                      \

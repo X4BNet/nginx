@@ -83,6 +83,8 @@ static ngx_int_t ngx_http_variable_request_filename(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_server_name(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_orig_request_method(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_request_method(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_remote_user(ngx_http_request_t *r,
@@ -133,6 +135,8 @@ static ngx_int_t ngx_http_variable_connection_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t ngx_http_variable_nginx_version(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_variable_nginx_build(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_variable_hostname(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
@@ -269,6 +273,10 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
       ngx_http_variable_request_method, 0,
       NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
+    { ngx_string("orig_request_method"), NULL,
+      ngx_http_variable_request_method, 0,
+      NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
     { ngx_string("remote_user"), NULL, ngx_http_variable_remote_user, 0, 0, 0 },
 
     { ngx_string("bytes_sent"), NULL, ngx_http_variable_bytes_sent,
@@ -348,6 +356,9 @@ static ngx_http_variable_t  ngx_http_core_variables[] = {
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
     { ngx_string("nginx_version"), NULL, ngx_http_variable_nginx_version,
+      0, 0, 0 },
+
+    { ngx_string("nginx_build"), NULL, ngx_http_variable_nginx_build,
       0, 0, 0 },
 
     { ngx_string("hostname"), NULL, ngx_http_variable_hostname,
@@ -1683,6 +1694,25 @@ ngx_http_variable_request_method(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_variable_orig_request_method(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    if (r->main->method_name.data) {
+        v->len = r->main->orig_method_name.len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = r->main->orig_method_name.data;
+
+    } else {
+        v->not_found = 1;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_variable_remote_user(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
@@ -2295,6 +2325,19 @@ ngx_http_variable_nginx_version(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
     v->data = (u_char *) NGINX_VERSION;
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_variable_nginx_build(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    v->len = sizeof(NGINX_VER_BUILD) - 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = (u_char *) NGINX_VER_BUILD;
 
     return NGX_OK;
 }
