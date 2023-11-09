@@ -213,10 +213,6 @@ ngx_http_static_handler(ngx_http_request_t *r)
 
 #endif
 
-    if (r->method == NGX_HTTP_POST) {
-        return NGX_HTTP_NOT_ALLOWED;
-    }
-
     rc = ngx_http_discard_request_body(r);
 
     if (rc != NGX_OK) {
