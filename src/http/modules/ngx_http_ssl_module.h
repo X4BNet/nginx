@@ -73,6 +73,8 @@ typedef struct {
     size_t                          dyn_rec_size_lo;
     size_t                          dyn_rec_size_hi;
     ngx_uint_t                      dyn_rec_threshold;
+
+    ngx_flag_t                      http_valid;
 } ngx_http_ssl_srv_conf_t;
 
 

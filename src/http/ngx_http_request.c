@@ -2078,14 +2078,16 @@ ngx_http_process_request(ngx_http_request_t *r)
         const char               *s;
         ngx_http_ssl_srv_conf_t  *sscf;
 
+        sscf = ngx_http_get_module_srv_conf(r, ngx_http_ssl_module);
+
         if (c->ssl == NULL) {
-            ngx_log_error(NGX_LOG_INFO, c->log, 0,
+            if(!sscf->http_valid){
+                ngx_log_error(NGX_LOG_INFO, c->log, 0,
                           "client sent plain HTTP request to HTTPS port");
+            }
             ngx_http_finalize_request(r, NGX_HTTP_TO_HTTPS);
             return;
         }
-
-        sscf = ngx_http_get_module_srv_conf(r, ngx_http_ssl_module);
 
         if (sscf->verify) {
             rc = SSL_get_verify_result(c->ssl->connection);

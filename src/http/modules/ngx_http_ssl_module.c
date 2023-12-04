@@ -296,6 +296,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       offsetof(ngx_http_ssl_srv_conf_t, reject_handshake),
       NULL },
 
+    { ngx_string("ssl_http_valid"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, http_valid),
+      NULL },
+
     { ngx_string("ssl_dyn_rec_enable"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -638,6 +645,7 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     sscf->dyn_rec_size_lo = NGX_CONF_UNSET_SIZE;
     sscf->dyn_rec_size_hi = NGX_CONF_UNSET_SIZE;
     sscf->dyn_rec_threshold = NGX_CONF_UNSET_UINT;
+    sscf->http_valid = NGX_CONF_UNSET;
 
     return sscf;
 }
@@ -726,6 +734,7 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                              4229);
     ngx_conf_merge_uint_value(conf->dyn_rec_threshold, prev->dyn_rec_threshold,
                              40);
+    ngx_conf_merge_value(conf->http_valid, prev->http_valid, 0);
 
     conf->ssl.log = cf->log;
 
