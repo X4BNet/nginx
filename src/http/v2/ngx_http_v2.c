@@ -1316,11 +1316,16 @@ ngx_http_v2_state_headers(ngx_http_v2_connection_t *h2c, u_char *pos,
                                          ngx_http_v2_module);
 
     if (h2c->processing >= h2c->concurrent_streams_limit) {
-        ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+        if(!h2c->stream_limit_reached) {
+            h2c->stream_limit_reached = 1;
+            ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
                       "concurrent streams exceeded %ui", h2c->processing);
+        }
 
         status = NGX_HTTP_V2_REFUSED_STREAM;
         goto rst_stream;
+    } else {
+        h2c->stream_limit_reached = 0;
     }
 
     if (!h2c->settings_ack

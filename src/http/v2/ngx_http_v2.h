@@ -166,6 +166,7 @@ struct ngx_http_v2_connection_s {
     unsigned                         goaway:1;
     unsigned                         push_disabled:1;
     unsigned                         limit_conn:1;
+    unsigned                         stream_limit_reached: 1;
 };
 
 
