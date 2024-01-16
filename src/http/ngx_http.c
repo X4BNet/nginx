@@ -9,7 +9,6 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-
 static char *ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_init_phases(ngx_conf_t *cf,
     ngx_http_core_main_conf_t *cmcf);
@@ -1221,6 +1220,37 @@ ngx_http_add_listen(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
     port->addrs.elts = NULL;
 
     return ngx_http_add_address(cf, cscf, port, lsopt);
+}
+
+
+ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, int fd) {
+    ngx_listening_t  *ls;
+    ngx_uint_t        i;
+    ngx_log_t        *log;
+    ngx_int_t         ret;
+
+    log = cycle->log;
+
+    ret = 0;
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+        if (ls[i].ignore) {
+            continue;
+        }
+
+        if (ls[i].fd == fd) {
+            if (ngx_close_socket(ls[i].fd) == -1) {
+                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                            ngx_close_socket_n " listening socket on %V failed",
+                            &ls[i].addr_text);
+            } else {            
+                ls[i].ignore = 1;
+                ret++;
+            }
+        }
+    }
+
+    return ret;
 }
 
 
