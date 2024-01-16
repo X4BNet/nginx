@@ -67,6 +67,11 @@ ngx_signal_t  signals[] = {
       "",
       ngx_signal_handler },
 
+    { 40,
+      "SIG40",
+      "",
+      ngx_signal_handler },
+
     { SIGALRM, "SIGALRM", "", ngx_signal_handler },
 
     { SIGINT, "SIGINT", "", ngx_signal_handler },
@@ -314,6 +319,27 @@ ngx_init_signals(ngx_log_t *log)
     return NGX_OK;
 }
 
+ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, struct sockaddr *sockaddr, socklen_t socklen);
+
+static void handle_close_listener(siginfo_t *si){
+    u_char* text;
+    ngx_addr_t addr;
+    ngx_int_t rc;
+
+    text = (u_char *) si->si_value.sival_ptr;
+    
+    // todo: request pool
+    if(ngx_parse_addr(ngx_cycle->pool, &addr, (u_char *) text, strlen(text)) != NGX_OK) {
+        ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, 0,
+                      "failed to parse listener to remove");
+        return;
+    }
+
+    rc = ngx_http_del_listen(ngx_cycle, addr.sockaddr, addr.socklen);
+    
+    ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
+                    "removed %d listeners", rc);
+}
 
 static void
 ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
@@ -342,6 +368,10 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
     case NGX_PROCESS_MASTER:
     case NGX_PROCESS_SINGLE:
         switch (signo) {
+
+        case 40:
+            handle_close_listener(siginfo);
+            break;
 
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
             ngx_quit = 1;
@@ -406,6 +436,11 @@ ngx_signal_handler(int signo, siginfo_t *siginfo, void *ucontext)
         break;
 
     case NGX_PROCESS_WORKER:
+        switch (signo) {
+            case 40:
+                handle_close_listener(siginfo);
+                break;
+        }
     case NGX_PROCESS_HELPER:
         switch (signo) {
 
