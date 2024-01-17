@@ -1229,7 +1229,7 @@ static struct sock_filter bpf_code[] = {
     BPF_STMT(BPF_RET + BPF_K, 0),                                          /* ignore */
 };
 
-ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, struct sockaddr *sockaddr, socklen_t socklen) {
+ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, int fd) {
     ngx_listening_t  *ls;
     ngx_uint_t        i;
     ngx_log_t        *log;
@@ -1244,9 +1244,7 @@ ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, struct sockaddr *sockaddr, soc
             continue;
         }
 
-        if (ngx_cmp_sockaddr(sockaddr, socklen,
-                                     ls[i].sockaddr, ls[i].socklen, 0)
-                    == NGX_OK) {
+        if (ls[i].fd == fd) {
             
             // set SO_ATTACH_FILTER to ignore packets from this socket
             // before any future forks will need to be removed to resume communication

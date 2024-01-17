@@ -128,7 +128,7 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);
 void ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc);
 
 
-ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, struct sockaddr *sockaddr, socklen_t socklen);
+ngx_int_t ngx_http_del_listen(ngx_cycle_t *cycle, int fd);
 
 void ngx_http_empty_handler(ngx_event_t *wev);
 void ngx_http_request_empty_handler(ngx_http_request_t *r);
